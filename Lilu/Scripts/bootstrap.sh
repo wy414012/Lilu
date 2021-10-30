@@ -19,7 +19,7 @@
 #  src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/acidanthera/Lilu/master/Lilu/Scripts/bootstrap.sh) && eval "$src" || exit 1
 #
 
-REPO_PATH="acidanthera/Lilu"
+REPO_PATH="wy414012/Lilu"
 SDK_PATH="Lilu.kext"
 SDK_CHECK_PATH="${SDK_PATH}/Contents/Resources/Headers/kern_api.hpp"
 
@@ -119,7 +119,7 @@ install_prebuilt_sdk() {
 
   # This is a really ugly hack due to GitHub API rate limits.
   local url="https://github.com/${REPO_PATH}"
-  "${GIT}" clone "${url}" -b "master" "tmp" || ret=$?
+  "${GIT}" clone "${url}" -b "yaming-network" "tmp" || ret=$?
   if [ $ret -ne 0 ]; then
     echo "ERROR: Failed to clone repository with code ${ret}!"
     return 1
@@ -230,7 +230,7 @@ install_compiled_sdk() {
     return 1
   fi
 
-  "${GIT}" clone "https://github.com/acidanthera/MacKernelSDK" -b "master" --depth=1 || ret=$?
+  "${GIT}" clone "https://github.com/wy414012/MacKernelSDK" -b "master" --depth=1 || ret=$?
   if [ $ret -ne 0 ]; then
     echo "ERROR: Failed to clone MacKernelSDK with code ${ret}!"
     return 1
