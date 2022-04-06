@@ -13,8 +13,8 @@ env:
 
 jobs:
   build:
-    name: 开始自动构建使用xcode13.0
-    runs-on: macos-11
+    name: xcode-latest构建
+    runs-on: macos-latest
     env:
       JOB_TYPE: BUILD
     steps:
