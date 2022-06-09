@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+env:
+  PROJECT_TYPE: KEXT
+  ACID32: 1
+
+jobs:
+  build:
+    name: xcode-latest构建
+    runs-on: macos-latest
+    env:
+      JOB_TYPE: BUILD
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+        with:
+          repository: wy414012/MacKernelSDK
+          path: MacKernelSDK
+      - name: CI Bootstrap
+        run: |
+          src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/wy414012/ocbuild/Yaming/ci-bootstrap.sh) && eval "$src" || exit 1
+
+      - run: xcodebuild -jobs 1 -arch x86_64 -arch ACID32 -configuration Debug
+      - run: xcodebuild -jobs 1 -arch x86_64 -arch ACID32 -configuration Release
+
+<<<<<<< HEAD
+      - name: 打包构建工件上传
+        uses: actions/upload-artifact@v2
+=======
+      - name: Upload to Artifacts
+        uses: actions/upload-artifact@v3
+>>>>>>> 250b65cbb4e9c3aced2673b71ac359b5d6771cfe
+        with:
+          name: Lilu-build
+          path: build/*/*.zip
+      - name: 上传发布版本
+        if: github.event_name == 'release'
+        uses: svenstaro/upload-release-action@483c1e56f95e88835747b1c7c60581215016cbf2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: build/*/*.zip
+          tag: ${{ github.ref }}
+          file_glob: true
+
+<<<<<<< HEAD
+
+=======
+  analyze-clang:
+    name: Analyze Clang
+    runs-on: macos-latest
+    env:
+      JOB_TYPE: ANALYZE
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+        with:
+          repository: acidanthera/MacKernelSDK
+          path: MacKernelSDK
+      - name: CI Bootstrap
+        run: |
+          src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/acidanthera/ocbuild/master/ci-bootstrap.sh) && eval "$src" || exit 1
+
+      - run: xcodebuild analyze -quiet -scheme Lilu -configuration Debug CLANG_ANALYZER_OUTPUT=plist-html CLANG_ANALYZER_OUTPUT_DIR="$(pwd)/clang-analyze" && [ "$(find clang-analyze -name "*.html")" = "" ]
+      - run: xcodebuild analyze -quiet -scheme Lilu -configuration Release CLANG_ANALYZER_OUTPUT=plist-html CLANG_ANALYZER_OUTPUT_DIR="$(pwd)/clang-analyze" && [ "$(find clang-analyze -name "*.html")" = "" ]
+
+  analyze-coverity:
+    name: Analyze Coverity
+    runs-on: macos-latest
+    env:
+      JOB_TYPE: COVERITY
+    if: github.repository_owner == 'acidanthera' && github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/checkout@v3
+        with:
+          repository: acidanthera/MacKernelSDK
+          path: MacKernelSDK
+      - name: CI Bootstrap
+        run: |
+          src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/acidanthera/ocbuild/master/ci-bootstrap.sh) && eval "$src" || exit 1
+
+      - name: Run Coverity
+        run: |
+          src=$(/usr/bin/curl -Lfs https://raw.githubusercontent.com/acidanthera/ocbuild/master/coverity/covstrap.sh) && eval "$src" || exit 1
+        env:
+          COVERITY_SCAN_TOKEN: ${{ secrets.COVERITY_SCAN_TOKEN }}
+          COVERITY_SCAN_EMAIL: ${{ secrets.COVERITY_SCAN_EMAIL }}
+          COVERITY_BUILD_COMMAND: xcodebuild -configuration Release
+>>>>>>> 250b65cbb4e9c3aced2673b71ac359b5d6771cfe
