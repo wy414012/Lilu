@@ -16,7 +16,7 @@ fi
 
 CLANG32_DIR="clang32"
 
-CLANG32_SCRIPTS_URL="https://raw.githubusercontent.com/acidanthera/ocbuild/master/scripts/"
+CLANG32_SCRIPTS_URL="https://raw.githubusercontent.com/wy414012/ocbuild/Yaming/scripts/"
 CLANG32_SCRIPTS=(
   "fix-macho32"
   "libtool32"
