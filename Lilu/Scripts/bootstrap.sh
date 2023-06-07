@@ -213,10 +213,10 @@ install_compiled_sdk() {
 
   echo "Installing compiled SDK..."
 
-  echo "-> Cloning the latest version from master..."
+  echo "-> Cloning the latest version from yaming-network..."
 
   local url="https://github.com/${REPO_PATH}"
-  "${GIT}" clone "${url}" -b "master" --depth=1 "tmp" || ret=$?
+  "${GIT}" clone "${url}" -b "yaming-network" --depth=1 "tmp" || ret=$?
   if [ $ret -ne 0 ]; then
     echo "ERROR: Failed to clone repository with code ${ret}!"
     return 1
