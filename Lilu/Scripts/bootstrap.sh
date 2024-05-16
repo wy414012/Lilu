@@ -238,7 +238,7 @@ install_compiled_sdk() {
 
   if [ -n "${ACID32}" ]; then
     echo "-> ACID32 specified, installing clang32..."
-    src=$("${CURL}" -Lfs https://raw.githubusercontent.com/acidanthera/ocbuild/master/clang32-bootstrap.sh) && eval "$src" || ret=$?
+    src=$("${CURL}" -Lfs https://raw.githubusercontent.com/wy414012/ocbuild/Yaming/clang32-bootstrap.sh) && eval "$src" || ret=$?
 
     if [ $ret -ne 0 ]; then
       echo "ERROR: Failed to install clang32 with code ${ret}!"
