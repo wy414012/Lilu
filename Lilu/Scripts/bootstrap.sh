@@ -249,7 +249,7 @@ install_compiled_sdk() {
   if [ -n "${ACID32}" ]; then
     "${XCODEBUILD}" -configuration Debug -arch ACID32 -arch x86_64 || ret=$?
   else
-    "${XCODEBUILD}" -configuration Debug -arch x86_64 || ret=$?
+    "${XCODEBUILD}" -configuration Debug -arch ACID32 -arch x86_64 || ret=$?
   fi
 
   if [ $ret -ne 0 ]; then
