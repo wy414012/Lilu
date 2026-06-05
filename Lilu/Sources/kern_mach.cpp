@@ -593,14 +593,14 @@ void MachInfo::findSectionBounds(void *ptr, size_t sourceSize, vm_address_t &vms
 					if (!strncmp(sect->sectname, sectionName, sizeof(sect->sectname))) {
 						auto sptr = static_cast<uint8_t *>(ptr) + sect->offset;
 						if (sptr + sect->size > endaddr) {
-							SYSLOG("mach", "found section %s size %u in segment %llu is invalid", sectionName, sno, (uint64_t)vmsegment);
+							SYSLOG("mach", "found section %s size %u in segment %u is invalid", sectionName, sect->size, sno);
 							return;
 						}
 						vmsegment = scmd->vmaddr;
 						vmsection = sect->addr;
 						sectionptr = sptr;
 						sectionSize = static_cast<size_t>(sect->size);
-						DBGLOG("mach", "found section %s size %u in segment %llu", sectionName, sno, (uint64_t)vmsegment);
+						DBGLOG("mach", "found section %s size %u in segment %u", sectionName, sect->size, sno);
 						return;
 					}
 
@@ -622,14 +622,14 @@ void MachInfo::findSectionBounds(void *ptr, size_t sourceSize, vm_address_t &vms
 					if (!strncmp(sect->sectname, sectionName, sizeof(sect->sectname))) {
 						auto sptr = static_cast<uint8_t *>(ptr) + sect->offset;
 						if (sptr + sect->size > endaddr) {
-							SYSLOG("mach", "found section %s size %u in segment %llu is invalid", sectionName, sno, (uint64_t)vmsegment);
+							SYSLOG("mach", "found section %s size %llu in segment %u is invalid", sectionName, sect->size, sno);
 							return;
 						}
 						vmsegment = (vm_address_t)scmd->vmaddr;
 						vmsection = (vm_address_t)sect->addr;
 						sectionptr = sptr;
 						sectionSize = static_cast<size_t>(sect->size);
-						DBGLOG("mach", "found section %s size %u in segment %llu", sectionName, sno, (uint64_t)vmsegment);
+						DBGLOG("mach", "found section %s size %llu in segment %u", sectionName, sect->size, sno);
 						return;
 					}
 
@@ -802,6 +802,47 @@ uint8_t *MachInfo::findImage(const char *identifier, uint32_t &imageSize, mach_v
 	return nullptr;
 }
 
+kern_return_t MachInfo::getAddressSlots(mach_header_64 *hdr, segment_command_64 *segment) {
+	auto section = reinterpret_cast<section_64 *>(segment + 1);
+	mach_vm_address_t last_slot_start = 0;
+	mach_vm_address_t last_slot_end = 0;
+	size_t idx = 0;
+	
+	if (segment->nsects == 0) {
+		return KERN_FAILURE;
+	}
+	
+	// First space is between the mach load commands and first section (usually __text)
+	if (section->addr < reinterpret_cast<mach_vm_address_t>(hdr) + sizeof(*hdr) + hdr->sizeofcmds) {
+		SYSLOG("mach", "Invalid section address for address slots");
+		return KERN_FAILURE;
+	}
+	
+	address_slots = reinterpret_cast<mach_vm_address_t>(hdr) + sizeof(*hdr) + hdr->sizeofcmds;
+	address_slots_end = section->addr;
+
+	// Find last section
+	for (idx = 0; idx < segment->nsects - 1; section++, idx++) {}
+	
+	// Second potential space is between the last section and the end of the segment
+	last_slot_start = section->addr + section->size;
+	last_slot_end = segment->vmaddr + segment->vmsize;
+	
+	DBGLOG("mach", "Potential slots: " PRIKADDR " - " PRIKADDR " : " PRIKADDR " - " PRIKADDR,
+		   CASTKADDR(address_slots), CASTKADDR(address_slots_end),
+		   CASTKADDR(last_slot_start), CASTKADDR(last_slot_end));
+	
+	if (last_slot_start > segment->vmaddr &&
+		(last_slot_end - last_slot_start) > (address_slots_end - address_slots)) {
+		address_slots = last_slot_start;
+		address_slots_end = last_slot_end;
+	}
+	
+	DBGLOG("mach", "activating slots for %s in " PRIKADDR " - " PRIKADDR, objectId, CASTKADDR(address_slots), CASTKADDR(address_slots_end));
+	
+	return KERN_SUCCESS;
+}
+
 kern_return_t MachInfo::kcGetRunningAddresses(mach_vm_address_t slide) {
 #if defined (__i386__)
 	// KC is not supported on 32-bit.
@@ -856,6 +897,12 @@ kern_return_t MachInfo::kcGetRunningAddresses(mach_vm_address_t slide) {
 			auto segCmd = reinterpret_cast<segment_command_64 *>(loadCmd);
 			DBGLOG("mach", "%s has segment is %s from " PRIKADDR " to " PRIKADDR, objectId, segCmd->segname,
 				   CASTKADDR(segCmd->vmaddr), CASTKADDR(segCmd->vmaddr + segCmd->vmsize));
+
+			// Try to find space for address slots in __TEXT segment
+			if (!strncmp(segCmd->segname, "__TEXT", sizeof(segCmd->segname)) && (slide || isKernel)) {
+				(void) getAddressSlots(inner, segCmd);
+			}
+			
 			if (!sym_buf && !strncmp(segCmd->segname, "__LINKEDIT", sizeof(segCmd->segname))) {
 				sym_buf = reinterpret_cast<uint8_t *>(segCmd->vmaddr);
 				sym_fileoff = segCmd->fileoff;
@@ -891,15 +938,6 @@ kern_return_t MachInfo::kcGetRunningAddresses(mach_vm_address_t slide) {
 	prelink_slid = true;
 	running_mh = inner;
 	memory_size = (size_t)(last_addr - reinterpret_cast<mach_vm_address_t>(inner));
-	if (slide != 0 || isKernel) {
-		address_slots = reinterpret_cast<mach_vm_address_t>(inner + 1) + inner->sizeofcmds;
-		address_slots_end = (address_slots + (PAGE_SIZE - 1)) & ~PAGE_SIZE;
-		while (*reinterpret_cast<uint32_t *>(address_slots_end) == 0) {
-			address_slots_end += PAGE_SIZE;
-		}
-
-		DBGLOG("mach", "activating slots for %s in " PRIKADDR " - " PRIKADDR, objectId, CASTKADDR(address_slots), CASTKADDR(address_slots_end));
-	}
 	return KERN_SUCCESS;
 
 #else
@@ -960,6 +998,10 @@ kern_return_t MachInfo::getRunningAddresses(mach_vm_address_t slide, size_t size
 				if (!strncmp(segCmd->segname, "__TEXT", sizeof(segCmd->segname))) {
 					running_text_addr = segCmd->vmaddr;
 					running_mh = mh;
+
+#if defined(__x86_64__)
+					(void) getAddressSlots(mh, segCmd);
+#endif
 					break;
 				}
 #if defined(__i386__)
@@ -1000,14 +1042,6 @@ kern_return_t MachInfo::getRunningAddresses(mach_vm_address_t slide, size_t size
 		kaslr_slide_set = true;
 
 		DBGLOG("mach", "aslr/load slide is 0x%llx", kaslr_slide);
-				
-#if defined(__x86_64__)
-		address_slots = reinterpret_cast<mach_vm_address_t>(running_mh + 1) + running_mh->sizeofcmds;
-		address_slots_end = (address_slots + (PAGE_SIZE - 1)) & ~PAGE_SIZE;
-		while (*reinterpret_cast<uint32_t *>(address_slots_end) == 0) {
-			address_slots_end += PAGE_SIZE;
-		}
-#endif
 	} else {
 		SYSLOG("mach", "couldn't find the running addresses");
 		return KERN_FAILURE;
